@@ -20,11 +20,12 @@
 //  + radio but stop forming media connections, since a mesh gets
 //  expensive fast.
 // ============================================================
-import * as peerjs from "https://esm.sh/peerjs@1.5.4";
 import { getLocalStream, hasMedia } from "./media.js";
 import { loadHistory, appendHistory, mergeHistory, updateReaction } from "./storage.js";
 
-const Peer = peerjs.Peer || peerjs.default;
+// PeerJS is vendored locally (vendor/peerjs.min.js) and exposed as window.Peer,
+// so the app never depends on a third-party CDN at runtime.
+const Peer = window.Peer;
 const MESH_CAP = 8;           // max members before A/V mesh is suspended
 const HISTORY_SHARE = 200;    // messages handed to a new joiner
 
@@ -284,6 +285,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
 
   function connect() {
     if (leaving) return;
+    if (!Peer) { h.onError && h.onError("peerjs-unavailable"); return; }
     status("Connecting…");
     peer = new Peer(HUB_ID);
     peer.on("open", () => startAsHub());

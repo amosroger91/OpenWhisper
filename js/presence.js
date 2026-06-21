@@ -10,8 +10,8 @@
 //  Note: this counts open sessions/tabs, not unique humans — good
 //  enough for a friendly "N online" on the landing page.
 // ============================================================
-import * as peerjs from "https://esm.sh/peerjs@1.5.4";
-const Peer = peerjs.Peer || peerjs.default;
+// PeerJS is vendored locally (vendor/peerjs.min.js → window.Peer).
+const Peer = window.Peer;
 
 const PRESENCE_ID = "ow-presence-v1";
 const HEARTBEAT_MS = 15000;
@@ -55,7 +55,7 @@ export function trackPresence({ onCount } = {}) {
   }
 
   function connect() {
-    if (stopped) return;
+    if (stopped || !Peer) return;
     peer = new Peer(PRESENCE_ID);
     peer.on("open", startHub);
     peer.on("error", (e) => {

@@ -11,8 +11,8 @@
 //  drop into that room via room.js (a 2-person star). If the hub
 //  leaves, clients re-elect.
 // ============================================================
-import * as peerjs from "https://esm.sh/peerjs@1.5.4";
-const Peer = peerjs.Peer || peerjs.default;
+// PeerJS is vendored locally (vendor/peerjs.min.js → window.Peer).
+const Peer = window.Peer;
 
 const LOBBY_ID = "ow-lobby-v1";
 
@@ -92,6 +92,7 @@ export function findMatch(handlers = {}) {
 
   function connect() {
     if (cancelled || matched) return;
+    if (!Peer) { onError && onError("peerjs-unavailable"); return; }
     status("Looking for people…");
     peer = new Peer(LOBBY_ID);
     peer.on("open", () => startAsHub());
