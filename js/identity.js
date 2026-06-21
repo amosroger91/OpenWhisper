@@ -33,6 +33,7 @@ export function makeRandomIdentity() {
     id: randomId(),
     name: pick(ADJECTIVES) + " " + pick(ANIMALS),
     color: pick(COLORS),
+    avatar: null,            // optional uploaded profile photo (data URL)
   };
 }
 
@@ -54,11 +55,20 @@ export function setName(name) {
 }
 
 export function reroll() {
+  const cur = getIdentity();
   const fresh = makeRandomIdentity();
-  // Keep the same stable id so we don't look like a different person mid-session.
-  fresh.id = getIdentity().id;
+  // Keep the stable id and any uploaded photo — reroll just shuffles name+color.
+  fresh.id = cur.id;
+  fresh.avatar = cur.avatar || null;
   saveIdentity(fresh);
   return fresh;
+}
+
+export function setAvatar(dataUrl) {
+  const id = getIdentity();
+  id.avatar = dataUrl || null;
+  saveIdentity(id);
+  return id;
 }
 
 export function initials(name) {

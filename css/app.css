@@ -31,6 +31,10 @@ html, body { height: 100%; margin: 0; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 2px rgba(0,0,0,0.25);
 }
 .ow-avatar--lg { width: 52px; height: 52px; font-size: 20px; }
+.ow-avatar--btn { border: 0; cursor: pointer; padding: 0; position: relative; }
+.ow-avatar--btn:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 0 0 2px var(--bl-accent); }
+/* when a photo is set */
+.ow-avatar.has-photo { color: transparent; background-size: cover; background-position: center; }
 
 /* ---- home ---- */
 .ow-home-body { padding: clamp(14px, 3vw, 30px); }
@@ -44,8 +48,11 @@ html, body { height: 100%; margin: 0; }
 @media (max-width: 720px) { .ow-cards { grid-template-columns: 1fr; } }
 
 .ow-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.ow-recent { margin-top: 6px; max-height: 150px; }
-.ow-recent__meta { margin-left: auto; }
+.ow-roomlist { max-height: 280px; }
+.ow-roomlist .bl-listview__item { padding: 9px 12px; }
+.ow-room__name { font-weight: 700; }
+.ow-room__desc { color: var(--bl-ink-dim); font-size: 12px; }
+.ow-room__go { margin-left: auto; color: var(--bl-ink-faint); }
 
 /* ---- room layout ---- */
 .ow-room-body { display: flex; flex-direction: column; padding: 0; }
@@ -75,7 +82,39 @@ html, body { height: 100%; margin: 0; }
 @media (max-width: 640px) { .ow-side { flex-basis: 168px; } }
 .ow-side__sec { display: flex; flex-direction: column; gap: 6px; }
 .ow-members { max-height: 40vh; }
+.ow-radio { gap: 8px; }
 .ow-radio .bl-select { width: 100%; }
+
+/* music player */
+.ow-player {
+  display: flex; align-items: center; gap: 10px; padding: 8px;
+  border: 1px solid var(--bl-line); border-radius: var(--bl-radius-md);
+  background: linear-gradient(180deg, var(--bl-white), var(--bl-face-panel)); box-shadow: var(--bl-shadow-1);
+}
+.ow-player__art {
+  position: relative; flex: 0 0 auto; width: 44px; height: 44px; border-radius: var(--bl-radius-sm);
+  display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(120% 120% at 30% 20%, var(--bl-accent), var(--bl-accent-deep)); color: #fff;
+}
+.ow-player__note { font-size: 20px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3)); }
+.ow-player__info { min-width: 0; flex: 1 1 auto; }
+.ow-player__title { font-weight: 700; font-size: var(--bl-text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow-player__sub { font-size: 11px; color: var(--bl-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow-player__btn { flex: 0 0 auto; }
+
+/* equalizer bars: hidden unless playing */
+.ow-eq { position: absolute; inset: 0; display: none; align-items: flex-end; justify-content: center; gap: 2px; padding: 8px; }
+.ow-eq i { width: 4px; height: 30%; background: rgba(255,255,255,0.9); border-radius: 1px; animation: ow-eq 0.9s ease-in-out infinite; }
+.ow-eq i:nth-child(2) { animation-delay: .15s; } .ow-eq i:nth-child(3) { animation-delay: .3s; } .ow-eq i:nth-child(4) { animation-delay: .45s; }
+@keyframes ow-eq { 0%,100% { height: 22%; } 50% { height: 92%; } }
+
+.ow-player[data-state="playing"] .ow-eq { display: flex; }
+.ow-player[data-state="playing"] .ow-player__note { display: none; }
+.ow-player[data-state="loading"] .ow-player__sub::after { content: " · connecting…"; }
+@media (prefers-reduced-motion: reduce) { .ow-eq i { animation: none; height: 60%; } }
+
+.ow-vol { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ow-vol .bl-slider { flex: 1 1 auto; }
 
 /* ---- chat ---- */
 .ow-chat { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
@@ -114,9 +153,11 @@ html, body { height: 100%; margin: 0; }
 .ow-react-add:hover { border-style: solid; border-color: var(--bl-accent); }
 
 /* shared emoji popover (reactions + composer insert) */
-.ow-picker { position: fixed; z-index: 1000; display: flex; flex-wrap: wrap; gap: 2px; max-width: 232px; padding: 6px; background: var(--bl-white); border: 1px solid var(--bl-edge-frame); border-radius: var(--bl-radius-md); box-shadow: var(--bl-shadow-2); }
+.ow-picker { position: fixed; z-index: 1000; display: flex; flex-wrap: wrap; gap: 2px; width: 252px; max-height: 244px; overflow-y: auto; padding: 6px; background: var(--bl-white); border: 1px solid var(--bl-edge-frame); border-radius: var(--bl-radius-md); box-shadow: var(--bl-shadow-2); }
 .ow-picker button { font-size: 18px; line-height: 1; padding: 4px 5px; border: 0; background: transparent; border-radius: var(--bl-radius-sm); cursor: pointer; }
 .ow-picker button:hover { background: var(--bl-accent-soft); }
+.ow-picker__sep { flex: 0 0 100%; height: 1px; background: var(--bl-line); margin: 4px 0; }
+.ow-picker__lbl { flex: 0 0 100%; font-family: var(--bl-font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--bl-ink-faint); padding: 2px 2px 0; }
 
 /* drag-and-drop mask */
 .ow-chat { position: relative; }

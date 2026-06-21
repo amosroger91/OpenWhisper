@@ -12,7 +12,7 @@ const MIRRORS = [
   "https://at1.api.radio-browser.info",
   "https://fr1.api.radio-browser.info",
 ];
-const TAGS = ["lofi", "jazz", "classical", "rock", "electronic", "pop", "reggae", "ambient"];
+const TAGS = ["lofi", "jazz", "classical", "rock", "country", "electronic", "pop", "reggae", "ambient"];
 
 let baseCache = null;
 let audio = null;

@@ -8,12 +8,14 @@ Open the page, you get a random nickname, and you're in.
 
 ## What it does
 
+- **Live online count** — the landing page shows how many people are using OpenWhisper right now.
+- **Profile** — pick a display name and upload a profile photo (or keep the random name + colored avatar). All stored locally.
 - **Quick Match** — get paired with the next random person who's also looking, for a private 1-on-1 (text + voice + video).
-- **Community Rooms** — join an open room by name (`#lounge`, `#late-night`, …). Anyone who types the same name lands in the same room. Make up a new name to start one.
+- **Community Rooms** — pick from a curated list (Lounge, The Galaxy Gateway, Dem Church Bois, Wellspring Studio, Late Night, Music). Everyone who picks the same room lands together.
 - **Voice & video** — toggle your mic/camera; a WebRTC mesh connects everyone in the room. (Auto-paused above ~8 people to keep things smooth — text and radio keep working.)
 - **Images & files** — attach, paste, or drag-and-drop. Images are auto-downscaled and render inline; any file (≤6 MB) sends as a download chip. Paste an image **link** and it renders too.
 - **Emoji reactions** — react to any message with 👍❤️😂…; reactions sync to everyone and persist with the message.
-- **Listen together** — pick an internet radio station and it plays for the whole room, in sync.
+- **Listen together** — a music-player-style control: pick an internet radio station (lofi, jazz, rock, country, classical, electronic, pop, …) and it plays for the whole room, in sync, with a live "now playing" + equalizer.
 - **History** — recent messages are kept on your device and replayed when you (or a newly-elected host) return. Best-effort, not guaranteed.
 - **No accounts** — your identity is a random name + color stored only in your browser. Rename or reroll anytime.
 

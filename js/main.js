@@ -4,16 +4,25 @@
 //  and listen-together radio (radio.js). No framework — just the
 //  DOM and the modules.
 // ============================================================
-import { getIdentity, setName, reroll, initials } from "./identity.js";
-import { loadRooms, rememberRoom } from "./storage.js";
+import { getIdentity, setName, reroll, setAvatar, initials } from "./identity.js";
 import { findMatch } from "./lobby.js";
 import { joinRoom } from "./room.js";
+import { trackPresence } from "./presence.js";
 import * as media from "./media.js";
 import * as radio from "./radio.js";
 
 const $ = (id) => document.getElementById(id);
-const THEME_KEY = "openwhisper:v1:theme";
-const SUGGESTED = ["lounge", "late-night", "music", "study", "games", "introverts"];
+
+// The fixed set of community rooms people can join. `id` is the stable key
+// (everyone who picks it lands together); `label` is what's shown.
+const ROOMS = [
+  { id: "lounge", label: "Lounge", desc: "the main hangout" },
+  { id: "the-galaxy-gateway", label: "The Galaxy Gateway", desc: "space to drift and talk" },
+  { id: "dem-church-bois", label: "Dem Church Bois", desc: "fellowship & good vibes" },
+  { id: "wellspring-studio", label: "Wellspring Studio", desc: "create & collaborate" },
+  { id: "late-night", label: "Late Night", desc: "for the night owls" },
+  { id: "music", label: "Music", desc: "share & listen together" },
+];
 
 let identity = getIdentity();
 let room = null;            // active room controller
@@ -21,10 +30,23 @@ let currentRoomId = null;
 let matcher = null;         // active quick-match search
 const renderedIds = new Set();
 const msgEls = new Map();       // msgId -> { el, msg }  (for reactions / updates)
-const memberMap = new Map();   // id -> {name, color}
+const memberMap = new Map();   // id -> {name, color, avatar}
 
 const REACTIONS = ["👍", "❤️", "😂", "🎉", "😮", "😢", "🔥", "👀"];
-const EMOJIS = ["😀","😂","😍","😎","🤔","😴","😢","😡","🥳","😱","👍","👎","🙏","👏","🙌","🔥","❤️","💯","✨","🎉","👀","🤝","💀","🤯"];
+// A broad set so you can react with / insert just about any emoji.
+const EMOJI_ALL = [
+  "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙",
+  "😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","🤐","🤨","😐","😑","😶","😏","😒","🙄","😬","🤥",
+  "😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢","🤮","🤧","🥵","🥶","🥴","😵","🤯","🤠","🥳","😎","🤓",
+  "🧐","😕","😟","🙁","☹️","😮","😯","😲","😳","🥺","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣",
+  "😞","😓","😩","😫","🥱","😤","😡","😠","🤬","😈","👿","💀","💩","🤡","👹","👻","👽","🤖","🎃",
+  "👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤏","👈","👉","👆",
+  "👇","☝️","✋","🤚","🖐️","🖖","👋","💪","🦾","🖕","✍️","🤳","💅",
+  "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💯","💢",
+  "💥","💫","💦","💨","🔥","✨","⭐","🌟","🎉","🎊","🎈","🎁","🏆","🥇","🎵","🎶","☀️","🌙","⚡","☂️",
+  "🌈","❄️","🍀","🌸","🌺","🌻","🌹","🍎","🍕","🍔","🍟","🌮","🍩","🍪","🍰","☕","🍺","🍻","🥂","🍷",
+  "⚽","🏀","🎮","🎲","🎯","🎸","🎤","🎧","📷","💻","📱","💡","💰","✅","❌","❓","❗","💤","👀","🫶",
+];
 const IMG_RE = /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?[^\s]*)?$/i;
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 const MAX_FILE = 6 * 1024 * 1024;   // 6 MB cap for arbitrary files
@@ -33,30 +55,30 @@ const tiles = new Map();       // memberId -> tile element
 let stations = [];
 let currentStation = null;
 let avLocked = false;          // true when the room is over the mesh cap
+let radioPlaying = false;      // is the shared station currently playing for me
 
-/* ===================== identity & theme ===================== */
-function paintAvatar(el, name, color) {
+/* ===================== identity ===================== */
+// Paint an avatar element: the uploaded photo if present, else colored initials.
+function applyAvatar(el, person) {
   if (!el) return;
-  el.textContent = initials(name);
-  el.style.setProperty("--ow-color", color);
+  const { name, color, avatar } = person || {};
+  el.style.setProperty("--ow-color", color || "#888");
+  if (avatar) { el.classList.add("has-photo"); el.style.backgroundImage = `url("${avatar}")`; el.textContent = ""; }
+  else { el.classList.remove("has-photo"); el.style.backgroundImage = ""; el.textContent = initials(name); }
 }
 function renderIdentity() {
   $("idChipName").textContent = identity.name;
   $("nameInput").value = identity.name;
-  paintAvatar($("idAvatar"), identity.name, identity.color);
-  paintAvatar($("idAvatarLg"), identity.name, identity.color);
-}
-function applyTheme(name) {
-  Bliss.setTheme(name, document.body);
-  try { localStorage.setItem(THEME_KEY, name); } catch {}
-  document.querySelectorAll("[data-theme]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === name)));
+  applyAvatar($("idAvatar"), identity);
+  applyAvatar($("idAvatarLg"), identity);
+  $("removePhotoBtn").hidden = !identity.avatar;
 }
 
 $("nameInput").addEventListener("input", () => {
   identity = setName($("nameInput").value);
   $("idChipName").textContent = identity.name;
-  paintAvatar($("idAvatar"), identity.name, identity.color);
-  paintAvatar($("idAvatarLg"), identity.name, identity.color);
+  applyAvatar($("idAvatar"), identity);
+  applyAvatar($("idAvatarLg"), identity);
   if (room) room.updateIdentity(identity);
 });
 $("rerollBtn").addEventListener("click", () => {
@@ -64,47 +86,53 @@ $("rerollBtn").addEventListener("click", () => {
   renderIdentity();
   if (room) room.updateIdentity(identity);
 });
-document.querySelectorAll("[data-theme]").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.theme)));
+
+// Profile photo upload (click the big avatar or the Photo button).
+$("photoBtn").addEventListener("click", () => $("avatarInput").click());
+$("idAvatarLg").addEventListener("click", () => $("avatarInput").click());
+$("avatarInput").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  try {
+    const dataUrl = await compressAvatar(file);
+    identity = setAvatar(dataUrl);
+    renderIdentity();
+    if (room) room.updateIdentity(identity);
+  } catch { Bliss.toast({ title: "Photo", body: "Couldn't load that image." }); }
+});
+$("removePhotoBtn").addEventListener("click", () => {
+  identity = setAvatar(null);
+  renderIdentity();
+  if (room) room.updateIdentity(identity);
+});
+// Square center-crop to a small data URL — kept tiny so it rides the roster.
+async function compressAvatar(file) {
+  const img = await loadImg(await readDataUrl(file));
+  const size = 128, c = document.createElement("canvas"); c.width = c.height = size;
+  const s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+  c.getContext("2d").drawImage(img, sx, sy, s, s, 0, 0, size, size);
+  return c.toDataURL("image/jpeg", 0.85);
+}
 
 /* ===================== home screen ===================== */
-function renderSuggested() {
-  const wrap = $("suggestedRooms");
-  wrap.innerHTML = "";
-  for (const name of SUGGESTED) {
-    const b = document.createElement("button");
-    b.className = "bl-btn bl-btn--sm";
-    b.type = "button";
-    b.textContent = "#" + name;
-    b.addEventListener("click", () => enterRoom(name, { label: "#" + name }));
-    wrap.appendChild(b);
-  }
-}
-function renderRecent() {
-  const rooms = loadRooms().filter((r) => !r.id.startsWith("match-"));
-  const wrap = $("recentRooms");
-  $("recentWrap").hidden = rooms.length === 0;
-  wrap.innerHTML = "";
-  for (const r of rooms) {
+function renderRoomList() {
+  const list = $("roomList");
+  list.innerHTML = "";
+  for (const r of ROOMS) {
     const item = document.createElement("div");
-    item.className = "bl-listview__item";
-    item.role = "option";
+    item.className = "bl-listview__item"; item.setAttribute("role", "option");
     const dot = document.createElement("span");
-    dot.className = "ow-avatar"; dot.style.setProperty("--ow-color", "#7d8a99"); dot.textContent = "#";
-    const label = document.createElement("span"); label.textContent = r.label || r.id;
-    const meta = document.createElement("span"); meta.className = "bl-listview__meta ow-recent__meta"; meta.textContent = "rejoin";
-    item.append(dot, label, meta);
+    dot.className = "ow-avatar"; dot.style.setProperty("--ow-color", "#5c7cfa"); dot.textContent = "#";
+    const meta = document.createElement("span"); meta.className = "bl-grow";
+    const nm = document.createElement("div"); nm.className = "ow-room__name"; nm.textContent = r.label;
+    const ds = document.createElement("div"); ds.className = "ow-room__desc"; ds.textContent = r.desc;
+    meta.append(nm, ds);
+    const go = document.createElement("span"); go.className = "ow-room__go bl-listview__meta"; go.textContent = "Join →";
+    item.append(dot, meta, go);
     item.addEventListener("click", () => enterRoom(r.id, { label: r.label }));
-    wrap.appendChild(item);
+    list.appendChild(item);
   }
 }
-
-$("roomForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const name = $("roomInput").value.trim();
-  if (!name) return;
-  enterRoom(name, { label: "#" + name.toLowerCase() });
-  $("roomInput").value = "";
-});
 
 /* ===================== quick match ===================== */
 $("quickMatchBtn").addEventListener("click", startQuickMatch);
@@ -143,8 +171,8 @@ function enterRoom(roomId, opts = {}) {
   showScreen("room");
   $("msgInput").focus();
 
-  if (!opts.private) { rememberRoom(roomId, opts.label || roomId); renderRecent(); }
   ensureStations();
+  radioPlaying = false; setPlayer("stopped", "Nothing playing", "Pick a station below");
 
   room = joinRoom({
     roomId,
@@ -168,8 +196,8 @@ function leaveRoom() {
   if (room) { room.leave(); room = null; }
   media.stopLocal(); radio.stopRadio();
   setMicState(false); setCamState(false);
-  currentStation = null; $("nowPlaying").textContent = "Nothing playing.";
-  showScreen("home"); renderRecent();
+  radioPlaying = false; currentStation = null;
+  showScreen("home");
 }
 $("leaveBtn").addEventListener("click", leaveRoom);
 $("leaveBtn2").addEventListener("click", leaveRoom);
@@ -183,25 +211,27 @@ function setConn(kind, text) {
 /* ===================== roster ===================== */
 function renderRoster(members, info = {}) {
   memberMap.clear();
-  for (const m of members) memberMap.set(m.id, { name: m.name, color: m.color });
+  for (const m of members) memberMap.set(m.id, { name: m.name, color: m.color, avatar: m.avatar || null });
   $("memberCount").textContent = members.length;
   const list = $("memberList");
   list.innerHTML = "";
   for (const m of members) {
     const item = document.createElement("div");
     item.className = "bl-listview__item";
-    const av = document.createElement("span");
-    av.className = "ow-avatar"; av.style.setProperty("--ow-color", m.color); av.textContent = initials(m.name);
+    const av = document.createElement("span"); av.className = "ow-avatar"; applyAvatar(av, m);
     const name = document.createElement("span"); name.textContent = m.name;
     const meta = document.createElement("span"); meta.className = "bl-listview__meta";
     meta.textContent = (m.id === identity.id ? "you" : "") + (m.av ? " 🔊" : "");
     item.append(av, name, meta);
     list.appendChild(item);
   }
-  // refresh any open tile labels
+  // refresh any open tile labels (name + photo can change live)
   for (const [id, tile] of tiles) {
     const info2 = id === identity.id ? identity : memberMap.get(id);
-    if (info2) tile.querySelector(".ow-tile__name span:last-child").textContent = info2.name;
+    if (info2) {
+      tile.querySelector(".ow-tile__name span:last-child").textContent = info2.name;
+      const dot = tile.querySelector(".ow-tile__name .ow-avatar"); if (dot) applyAvatar(dot, info2);
+    }
   }
   avLocked = !!info.capped;
   $("capNote").hidden = !avLocked;
@@ -277,8 +307,9 @@ function renderMessage(msg) {
 
   const me = msg.from === identity.id;
   wrap.className = "ow-msg" + (me ? " ow-msg--me" : "");
+  const sender = me ? identity : (memberMap.get(msg.from) || { name: msg.name, color: msg.color, avatar: null });
   const av = document.createElement("span");
-  av.className = "ow-avatar"; av.style.setProperty("--ow-color", msg.color || "#888"); av.textContent = initials(msg.name);
+  av.className = "ow-avatar"; applyAvatar(av, sender);
   const body = document.createElement("div"); body.className = "ow-msg__body";
   if (!me) { const who = document.createElement("div"); who.className = "ow-msg__who"; who.style.color = msg.color || ""; who.textContent = msg.name; body.appendChild(who); }
 
@@ -320,7 +351,7 @@ function renderReactions(entry) {
   }
   const add = document.createElement("button");
   add.type = "button"; add.className = "ow-react-add"; add.textContent = "＋"; add.title = "Add reaction";
-  add.addEventListener("click", (e) => { e.stopPropagation(); openPicker(add, REACTIONS, (emoji) => { if (room) room.sendReact(msg.id, emoji); }); });
+  add.addEventListener("click", (e) => { e.stopPropagation(); openEmojiPicker(add, (emoji) => { if (room) room.sendReact(msg.id, emoji); }); });
   reacts.appendChild(add);
 }
 
@@ -352,14 +383,23 @@ function closePicker() {
   if (pickerEl) { pickerEl.remove(); pickerEl = null; document.removeEventListener("pointerdown", onPickerOutside, true); }
 }
 function onPickerOutside(e) { if (pickerEl && !pickerEl.contains(e.target)) closePicker(); }
-function openPicker(anchor, emojis, onPick) {
+function emojiBtnEl(em, onPick) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = em;
+  b.addEventListener("click", () => { onPick(em); closePicker(); });
+  return b;
+}
+// One picker for both reactions and composing: quick row up top, then the
+// full set below so you can pick any emoji ("add custom reaction").
+function openEmojiPicker(anchor, onPick) {
   closePicker();
   pickerEl = document.createElement("div"); pickerEl.className = "ow-picker";
-  for (const em of emojis) {
-    const b = document.createElement("button"); b.type = "button"; b.textContent = em;
-    b.addEventListener("click", () => { onPick(em); closePicker(); });
-    pickerEl.appendChild(b);
-  }
+  const quickLbl = document.createElement("span"); quickLbl.className = "ow-picker__lbl"; quickLbl.textContent = "Quick";
+  pickerEl.appendChild(quickLbl);
+  for (const em of REACTIONS) pickerEl.appendChild(emojiBtnEl(em, onPick));
+  const sep = document.createElement("span"); sep.className = "ow-picker__sep"; pickerEl.appendChild(sep);
+  const allLbl = document.createElement("span"); allLbl.className = "ow-picker__lbl"; allLbl.textContent = "All emoji";
+  pickerEl.appendChild(allLbl);
+  for (const em of EMOJI_ALL) pickerEl.appendChild(emojiBtnEl(em, onPick));
   document.body.appendChild(pickerEl);
   const r = anchor.getBoundingClientRect();
   const pw = pickerEl.offsetWidth, ph = pickerEl.offsetHeight;
@@ -370,7 +410,7 @@ function openPicker(anchor, emojis, onPick) {
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePicker(); });
 
-$("emojiBtn").addEventListener("click", () => openPicker($("emojiBtn"), EMOJIS, insertEmoji));
+$("emojiBtn").addEventListener("click", () => openEmojiPicker($("emojiBtn"), insertEmoji));
 function insertEmoji(em) {
   const inp = $("msgInput");
   const s = inp.selectionStart ?? inp.value.length, e = inp.selectionEnd ?? inp.value.length;
@@ -476,7 +516,7 @@ function addTile(memberId, stream, isSelf) {
     video.autoplay = true; video.playsInline = true; if (isSelf) video.muted = true;
     const label = document.createElement("div"); label.className = "ow-tile__name";
     const dot = document.createElement("span"); dot.className = "ow-avatar"; dot.style.width = dot.style.height = "16px"; dot.style.fontSize = "8px";
-    dot.style.setProperty("--ow-color", info.color); dot.textContent = initials(info.name);
+    applyAvatar(dot, info);
     const nm = document.createElement("span"); nm.textContent = info.name;
     label.append(dot, nm);
     tile.append(video, label);
@@ -493,7 +533,7 @@ function removeTile(memberId) {
   $("mediaStrip").hidden = tiles.size === 0;
 }
 
-/* ===================== listen-together radio ===================== */
+/* ===================== listen-together radio (music player) ===================== */
 async function ensureStations() {
   if (stations.length) return;
   try {
@@ -509,43 +549,72 @@ async function ensureStations() {
     $("stationSelect").innerHTML = '<option value="">Stations unavailable</option>';
   }
 }
-$("radioPlayBtn").addEventListener("click", async () => {
+
+// Reflect player state in the UI. state: "stopped" | "loading" | "playing".
+function setPlayer(state, title, sub) {
+  $("player").dataset.state = state;
+  if (title != null) $("npTitle").textContent = title;
+  if (sub != null) $("npSub").textContent = sub;
+  const playing = state === "playing";
+  $("radioToggle").textContent = playing ? "⏸" : "▶";
+  $("radioToggle").setAttribute("aria-label", playing ? "Pause" : "Play");
+}
+
+async function playSelected() {
   const url = $("stationSelect").value;
   if (!url) { Bliss.toast("Pick a station first"); return; }
-  const s = stations.find((x) => x.url === url) || { name: "Station", url };
+  const s = stations.find((x) => x.url === url) || { name: "Station", url, tag: "" };
+  setPlayer("loading", s.name, s.tag || "connecting");
   const ok = await radio.playStation(url);
   currentStation = s;
-  $("nowPlaying").textContent = ok ? "▶ " + s.name : "Couldn't play this station.";
-  if (ok && room) room.sendRadio({ action: "play", station: s });
-});
-$("radioStopBtn").addEventListener("click", () => {
-  radio.stopRadio();
-  $("nowPlaying").textContent = "Stopped.";
-  if (room) room.sendRadio({ action: "stop" });
-});
+  if (ok) {
+    radioPlaying = true;
+    setPlayer("playing", s.name, "📻 " + (s.tag || "live"));
+    if (room) room.sendRadio({ action: "play", station: s });
+  } else {
+    radioPlaying = false;
+    setPlayer("stopped", s.name, "couldn't play — try another");
+  }
+}
+function stopRadioLocal(sync) {
+  radio.stopRadio(); radioPlaying = false;
+  setPlayer("stopped", "Nothing playing", "Pick a station below");
+  if (sync && room) room.sendRadio({ action: "stop" });
+}
+
+$("radioToggle").addEventListener("click", () => { radioPlaying ? stopRadioLocal(true) : playSelected(); });
+// Picking a different station while playing switches the room to it.
+$("stationSelect").addEventListener("change", () => { if (radioPlaying) playSelected(); });
 $("radioVol").addEventListener("input", (e) => radio.setRadioVolume(e.target.value / 100));
 
 function onRemoteRadio(state) {
   if (!state) return;
-  if (state.action === "stop") { radio.stopRadio(); $("nowPlaying").textContent = "Stopped by the room."; return; }
+  if (state.action === "stop") {
+    radio.stopRadio(); radioPlaying = false;
+    setPlayer("stopped", "Nothing playing", "stopped by the room");
+    return;
+  }
   if (state.action === "play" && state.station) {
     currentStation = state.station;
     $("stationSelect").value = state.station.url || "";
+    setPlayer("loading", state.station.name, state.station.tag || "");
     radio.playStation(state.station.url).then((ok) => {
-      $("nowPlaying").textContent = ok ? "▶ " + state.station.name + " (room)" : "▶ " + state.station.name + " — tap Play to join";
+      radioPlaying = ok;
+      if (ok) setPlayer("playing", state.station.name, "📻 " + (state.station.tag || "live"));
+      else setPlayer("stopped", state.station.name, "tap ▶ to join the music");
     });
   }
 }
 
 /* ===================== boot ===================== */
+let presence = null;
 function boot() {
-  let theme = "blue";
-  try { theme = localStorage.getItem(THEME_KEY) || "blue"; } catch {}
-  applyTheme(theme);
+  if (window.Bliss) Bliss.setTheme("blue", document.body);
   renderIdentity();
-  renderSuggested();
-  renderRecent();
+  renderRoomList();
   showScreen("home");
+  // Global "N online" counter — stays connected for the whole session.
+  presence = trackPresence({ onCount: (n) => { $("onlineCount").textContent = n; } });
 }
 boot();
-window.addEventListener("beforeunload", () => { if (room) room.leave(); });
+window.addEventListener("beforeunload", () => { if (room) room.leave(); if (presence) presence.stop(); });

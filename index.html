@@ -28,10 +28,7 @@
         <span id="idChipName">…</span>
       </div>
       <span class="bl-grow"></span>
-      <span class="bl-eyebrow" style="margin-right:4px">Scheme</span>
-      <button class="bl-btn bl-btn--sm" type="button" data-theme="blue">Blue</button>
-      <button class="bl-btn bl-btn--sm" type="button" data-theme="olive">Olive</button>
-      <button class="bl-btn bl-btn--sm" type="button" data-theme="silver">Silver</button>
+      <span class="bl-badge bl-badge--ok" id="onlineBadge" title="People using OpenWhisper right now"><span class="bl-badge__dot"></span><b id="onlineCount">…</b>&nbsp;online</span>
     </div>
 
     <div class="bl-window__body ow-home-body">
@@ -46,13 +43,18 @@
         <div class="bl-card__head">You</div>
         <div class="bl-card__body">
           <div class="ow-id-row">
-            <span class="ow-avatar ow-avatar--lg" id="idAvatarLg">?</span>
+            <button class="ow-avatar ow-avatar--lg ow-avatar--btn" id="idAvatarLg" type="button" title="Upload a profile photo">?</button>
             <label class="bl-field bl-grow" style="margin:0">
               <span class="bl-label">Display name</span>
               <input class="bl-input" id="nameInput" type="text" maxlength="24" placeholder="Your name">
-              <span class="bl-help">Stored only on this device. No one needs your real name.</span>
+              <span class="bl-help">Stored only on this device. Click the circle to add a photo.</span>
             </label>
-            <button class="bl-btn bl-btn--sm" id="rerollBtn" type="button" title="New random identity">🎲 Reroll</button>
+            <div class="bl-col" style="gap:6px">
+              <button class="bl-btn bl-btn--sm" id="photoBtn" type="button" title="Upload a profile photo">📷 Photo</button>
+              <button class="bl-btn bl-btn--sm" id="removePhotoBtn" type="button" title="Remove photo" hidden>✕ Remove</button>
+              <button class="bl-btn bl-btn--sm" id="rerollBtn" type="button" title="New random name & color">🎲 Reroll</button>
+            </div>
+            <input type="file" id="avatarInput" accept="image/*" hidden>
           </div>
         </div>
       </div>
@@ -71,19 +73,8 @@
         <div class="bl-card ow-card">
           <div class="bl-card__head">Community Rooms</div>
           <div class="bl-card__body bl-stack">
-            <p style="margin:0">Join an open room by name — anyone with the same name lands together. Make up a new one to start it.</p>
-            <form class="bl-row" id="roomForm" style="gap:6px">
-              <input class="bl-input bl-grow" id="roomInput" type="text" maxlength="40" placeholder="e.g. lounge, late-night, music" autocomplete="off">
-              <button class="bl-btn bl-btn--default" id="joinRoomBtn" type="submit">Join</button>
-            </form>
-            <div>
-              <span class="bl-eyebrow">Popular</span>
-              <div class="ow-chips" id="suggestedRooms"></div>
-            </div>
-            <div id="recentWrap" hidden>
-              <span class="bl-eyebrow">You were in</span>
-              <div class="bl-listview ow-recent" id="recentRooms" role="listbox" aria-label="Recent rooms"></div>
-            </div>
+            <p style="margin:0">Pick a room and jump in — everyone who picks the same one lands together.</p>
+            <div class="bl-listview ow-roomlist" id="roomList" role="listbox" aria-label="Community rooms"></div>
           </div>
         </div>
       </div>
@@ -128,13 +119,21 @@
 
           <div class="ow-side__sec ow-radio">
             <span class="bl-eyebrow">📻 Listen together</span>
-            <select class="bl-select" id="stationSelect"><option value="">Loading stations…</option></select>
-            <div class="bl-row" style="gap:6px">
-              <button class="bl-btn bl-btn--sm bl-btn--default" id="radioPlayBtn" type="button">▶ Play</button>
-              <button class="bl-btn bl-btn--sm" id="radioStopBtn" type="button">■ Stop</button>
+            <div class="ow-player" id="player" data-state="stopped">
+              <div class="ow-player__art" id="playerArt">
+                <span class="ow-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                <span class="ow-player__note">🎵</span>
+              </div>
+              <div class="ow-player__info">
+                <div class="ow-player__title" id="npTitle">Nothing playing</div>
+                <div class="ow-player__sub" id="npSub">Pick a station below</div>
+              </div>
+              <button class="bl-btn bl-btn--icon ow-player__btn" id="radioToggle" type="button" title="Play / pause" aria-label="Play">▶</button>
             </div>
-            <input class="bl-slider" id="radioVol" type="range" min="0" max="100" value="50" aria-label="Radio volume">
-            <p class="bl-help" id="nowPlaying">Nothing playing.</p>
+            <select class="bl-select" id="stationSelect"><option value="">Loading stations…</option></select>
+            <label class="ow-vol" title="Your volume">🔈
+              <input class="bl-slider" id="radioVol" type="range" min="0" max="100" value="50" aria-label="Radio volume">
+            </label>
           </div>
         </aside>
 

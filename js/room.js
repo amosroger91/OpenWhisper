@@ -57,7 +57,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
 
   /* ---------------- roster helpers ---------------- */
   function selfMember() {
-    return { id: identity.id, name: identity.name, color: identity.color, peerId: myPeerId(), av: hasMedia() };
+    return { id: identity.id, name: identity.name, color: identity.color, avatar: identity.avatar || null, peerId: myPeerId(), av: hasMedia() };
   }
   function upsert(m) {
     const i = members.findIndex((x) => x.id === m.id);
@@ -127,7 +127,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     if (!env || !env.t) return;
     if (env.t === "hello") {
       const m = env.d || {};
-      upsert({ id: m.id, name: m.name, color: m.color, peerId: fromPeerId, av: false });
+      upsert({ id: m.id, name: m.name, color: m.color, avatar: m.avatar || null, peerId: fromPeerId, av: false });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         const hist = loadHistory(roomId).slice(-HISTORY_SHARE);
@@ -149,7 +149,13 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       broadcast({ t: "radio", d: radioState }, fromPeerId);
     } else if (env.t === "meta") {
       const i = members.findIndex((x) => x.peerId === fromPeerId);
-      if (i >= 0) members[i].av = !!(env.d && env.d.av);
+      if (i >= 0) {
+        const d = env.d || {};
+        members[i].av = !!d.av;
+        if (d.name != null) members[i].name = d.name;
+        if (d.color != null) members[i].color = d.color;
+        if ("avatar" in d) members[i].avatar = d.avatar || null;
+      }
       emitRoster(); broadcast({ t: "roster", d: members.slice() });
     }
   }
@@ -225,7 +231,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     hubConn = c;
     c.on("open", () => {
       status("Connected");
-      try { c.send({ t: "hello", d: { id: identity.id, name: identity.name, color: identity.color } }); } catch {}
+      try { c.send({ t: "hello", d: { id: identity.id, name: identity.name, color: identity.color, avatar: identity.avatar || null } }); } catch {}
     });
     c.on("data", handleFromHub);
     c.on("close", () => { if (!leaving) reelect(); });
@@ -337,8 +343,9 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     updateIdentity(next) {
       identity = { ...identity, ...next };
       const i = members.findIndex((x) => x.id === identity.id);
-      if (i >= 0) { members[i].name = identity.name; members[i].color = identity.color; }
+      if (i >= 0) { members[i].name = identity.name; members[i].color = identity.color; members[i].avatar = identity.avatar || null; }
       if (isHub) { emitRoster(); broadcast({ t: "roster", d: members.slice() }); }
+      else toHub({ t: "meta", d: { av: hasMedia(), name: identity.name, color: identity.color, avatar: identity.avatar || null } });
     },
     leave() {
       leaving = true;
