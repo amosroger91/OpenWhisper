@@ -171,6 +171,22 @@ html, body { height: 100%; margin: 0; }
 .ow-gifpicker__cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ow-gifpicker__msg { grid-column: 1 / -1; padding: 22px 6px; text-align: center; color: var(--bl-ink-faint); font-size: 12px; }
 
+/* watch-together (YouTube) + shared audio */
+.ow-yt { background: #000; border-bottom: 1px solid var(--bl-edge-frame); display: flex; flex-direction: column; }
+.ow-yt[hidden] { display: none; }
+.ow-yt__bar { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: var(--bl-accent); color: #fff; }
+.ow-yt__label { flex: 1; font-size: 12px; font-weight: 700; }
+.ow-yt__bar .bl-btn { color: #fff; }
+.ow-yt__frame { position: relative; width: 100%; max-width: 680px; margin: 0 auto; aspect-ratio: 16 / 9; max-height: 42vh; background: #000; }
+.ow-yt__frame > div, .ow-yt__frame iframe { position: absolute; inset: 0; width: 100% !important; height: 100% !important; border: 0; }
+.ow-watch__row { display: flex; gap: 6px; }
+.ow-watch__row input { font-size: 12px; }
+.ow-watch__audio { width: 100%; margin-top: 6px; }
+.ow-audionow { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 8px; background: var(--bl-accent-soft); border: 1px solid var(--bl-line); border-radius: var(--bl-radius-sm); }
+.ow-audionow[hidden] { display: none; }
+.ow-audionow__icon { font-size: 14px; }
+.ow-audionow__name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* drag-and-drop mask */
 .ow-chat { position: relative; }
 .ow-dropmask { position: absolute; inset: 6px; z-index: 5; display: grid; place-items: center; border: 2px dashed var(--bl-accent); border-radius: var(--bl-radius-lg); background: rgba(var(--bl-accent-rgb), 0.12); font-family: var(--bl-font-title); font-weight: 700; color: var(--bl-accent-deep); pointer-events: none; }

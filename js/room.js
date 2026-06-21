@@ -46,6 +46,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
   const clientConns = new Map();  // hub: remotePeerId -> DataConnection
   let members = [];               // both: roster [{id,name,color,peerId,av}]
   let radioState = null;          // last known shared radio state
+  let stageState = null;          // last known shared "stage" (youtube video / shared audio)
   let leaving = false;
   let reelectTimer = null;
 
@@ -132,7 +133,7 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         const hist = loadHistory(roomId).slice(-HISTORY_SHARE);
-        try { conn.send({ t: "welcome", d: { roster: members.slice(), history: hist, radio: radioState } }); } catch {}
+        try { conn.send({ t: "welcome", d: { roster: members.slice(), history: hist, radio: radioState, stage: stageState } }); } catch {}
       }
       const sm = sysMsg(`${m.name || "Someone"} joined`);
       deliverChat(sm); broadcast({ t: "chat", d: sm });
@@ -148,6 +149,10 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       radioState = env.d || null;
       h.onRadio && h.onRadio(radioState);
       broadcast({ t: "radio", d: radioState }, fromPeerId);
+    } else if (env.t === "stage") {
+      stageState = env.d || null;
+      h.onStage && h.onStage(stageState);
+      broadcast({ t: "stage", d: stageState }, fromPeerId);
     } else if (env.t === "meta") {
       const i = members.findIndex((x) => x.peerId === fromPeerId);
       if (i >= 0) {
@@ -167,9 +172,11 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     if (env.t === "welcome") {
       members = (env.d.roster || []).slice();
       radioState = env.d.radio || null;
+      stageState = env.d.stage || null;
       mergeHistory(roomId, env.d.history || []);
       if (env.d.history && env.d.history.length && h.onHistory) h.onHistory(env.d.history);
       if (radioState && h.onRadio) h.onRadio(radioState);
+      if (stageState && h.onStage) h.onStage(stageState);
       emitRoster();
     } else if (env.t === "roster") {
       members = (env.d || []).slice();
@@ -182,6 +189,9 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     } else if (env.t === "radio") {
       radioState = env.d || null;
       h.onRadio && h.onRadio(radioState);
+    } else if (env.t === "stage") {
+      stageState = env.d || null;
+      h.onStage && h.onStage(stageState);
     }
   }
 
@@ -331,6 +341,12 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       radioState = state || null;
       if (isHub) broadcast({ t: "radio", d: radioState });
       else toHub({ t: "radio", d: radioState });
+    },
+    // Shared "stage": a synced YouTube video or a shared audio file.
+    sendStage(state) {
+      stageState = state || null;
+      if (isHub) broadcast({ t: "stage", d: stageState });
+      else toHub({ t: "stage", d: stageState });
     },
     // Call after media.setMedia(): refresh our streams across the mesh and
     // announce our new A/V status so others (re)dial us.

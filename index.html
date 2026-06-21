@@ -108,6 +108,15 @@
       <!-- video tiles (hidden until someone has a stream) -->
       <div class="ow-media" id="mediaStrip" hidden></div>
 
+      <!-- synced YouTube watch-together (hidden until a video is on) -->
+      <div class="ow-yt" id="ytPanel" hidden>
+        <div class="ow-yt__bar">
+          <span class="ow-yt__label" id="ytLabel">📺 Watching together</span>
+          <button class="bl-btn bl-btn--icon" id="ytCloseBtn" type="button" title="Close video" aria-label="Close video">×</button>
+        </div>
+        <div class="ow-yt__frame"><div id="ytPlayer"></div></div>
+      </div>
+
       <div class="ow-room-main">
         <!-- sidebar: members + radio -->
         <aside class="ow-side">
@@ -134,6 +143,21 @@
             <label class="ow-vol" title="Your volume">🔈
               <input class="bl-slider" id="radioVol" type="range" min="0" max="100" value="50" aria-label="Radio volume">
             </label>
+          </div>
+
+          <div class="ow-side__sec ow-watch">
+            <span class="bl-eyebrow">📺 Watch / 🎵 Share</span>
+            <div class="ow-watch__row">
+              <input class="bl-input bl-grow" id="ytUrl" type="text" placeholder="Paste a YouTube link…" maxlength="200" autocomplete="off">
+              <button class="bl-btn bl-btn--sm" id="ytLoadBtn" type="button">Watch</button>
+            </div>
+            <button class="bl-btn bl-btn--sm ow-watch__audio" id="audioShareBtn" type="button">🎵 Share an audio file</button>
+            <input type="file" id="audioInput" accept="audio/*" hidden>
+            <div class="ow-audionow" id="audioNow" hidden>
+              <span class="ow-audionow__icon" aria-hidden="true">🎵</span>
+              <span class="ow-audionow__name bl-grow" id="audioNowName">—</span>
+              <button class="bl-btn bl-btn--icon" id="audioToggle" type="button" title="Play / pause" aria-label="Play / pause">⏸</button>
+            </div>
           </div>
         </aside>
 

@@ -11,6 +11,7 @@ import { trackPresence } from "./presence.js";
 import * as media from "./media.js";
 import * as radio from "./radio.js";
 import { searchGifs } from "./gifs.js";
+import * as watch from "./watch.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -187,6 +188,7 @@ function enterRoom(roomId, opts = {}) {
       onChat: (m) => renderMessage(m),
       onReact: (msgId, reactions, emoji, from) => onReact(msgId, reactions, emoji, from),
       onRadio: (state) => onRemoteRadio(state),
+      onStage: (state) => onRemoteStage(state),
       onRemoteStream: (memberId, stream) => addTile(memberId, stream, false),
       onRemoteEnd: (memberId) => removeTile(memberId),
     },
@@ -196,6 +198,7 @@ function leaveRoom() {
   closePicker();
   if (room) { room.leave(); room = null; }
   media.stopLocal(); radio.stopRadio();
+  videoStopLocal(); audioStopLocal();
   setMicState(false); setCamState(false);
   radioPlaying = false; currentStation = null;
   showScreen("home");
@@ -623,7 +626,8 @@ async function playSelected() {
   if (ok) {
     radioPlaying = true;
     setPlayer("playing", s.name, "📻 " + (s.tag || "live"));
-    if (room) room.sendRadio({ action: "play", station: s });
+    videoStopLocal(); audioStopLocal();                 // radio takes the stage
+    if (room) { room.sendRadio({ action: "play", station: s }); room.sendStage(null); }
   } else {
     radioPlaying = false;
     setPlayer("stopped", s.name, "couldn't play — try another");
@@ -648,6 +652,7 @@ function onRemoteRadio(state) {
     return;
   }
   if (state.action === "play" && state.station) {
+    videoStopLocal(); audioStopLocal();                 // radio took the stage in the room
     currentStation = state.station;
     $("stationSelect").value = state.station.url || "";
     setPlayer("loading", state.station.name, state.station.tag || "");
@@ -656,6 +661,121 @@ function onRemoteRadio(state) {
       if (ok) setPlayer("playing", state.station.name, "📻 " + (state.station.tag || "live"));
       else setPlayer("stopped", state.station.name, "tap ▶ to join the music");
     });
+  }
+}
+
+/* ===================== watch together (YouTube) + shared audio =====================
+   radio, video and audio are mutually exclusive — starting one stops the others
+   across the room. radio uses its own channel; video + audio share the "stage". */
+let videoActive = false, currentVideoId = null, ytInited = false;
+let sharedAudio = null, audioActive = false, currentAudioId = null, lastAudioDataUrl = null;
+const MAX_AUDIO = 6 * 1024 * 1024;
+
+function pauseRadioForStage(reason) {
+  if (radioPlaying || radio.isRadioOn()) {
+    radio.stopRadio(); radioPlaying = false;
+    setPlayer("stopped", "Nothing playing", reason ? "paused for the " + reason : "Pick a station below");
+  }
+}
+function ensureYT() {
+  if (ytInited) return;
+  ytInited = true;
+  watch.initYouTube("ytPlayer", (action, time) => {
+    // The user pressed play/pause inside the iframe → sync it to the room.
+    if (!videoActive || !room || action === "ended") return;
+    room.sendStage({ type: "video", videoId: currentVideoId, playing: action === "play", time, ts: Date.now() });
+  });
+}
+
+/* ---- YouTube ---- */
+function startVideo(id, broadcast) {
+  pauseRadioForStage("video"); audioStopLocal();
+  $("ytPanel").hidden = false; ensureYT();
+  currentVideoId = id; videoActive = true;
+  watch.loadVideo(id, 0, true);
+  if (broadcast && room) { room.sendStage({ type: "video", videoId: id, playing: true, time: 0, ts: Date.now() }); room.sendRadio({ action: "stop" }); }
+}
+function videoStopLocal() {
+  if (!videoActive && $("ytPanel").hidden) return;
+  videoActive = false; currentVideoId = null;
+  try { watch.stop(); } catch {}
+  $("ytPanel").hidden = true;
+}
+$("ytLoadBtn").addEventListener("click", () => {
+  if (!room) { Bliss.toast("Join a room first"); return; }
+  const id = watch.extractId($("ytUrl").value);
+  if (!id) { Bliss.toast({ title: "YouTube", body: "Paste a valid YouTube link." }); return; }
+  $("ytUrl").value = "";
+  startVideo(id, true);
+});
+$("ytUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("ytLoadBtn").click(); } });
+$("ytCloseBtn").addEventListener("click", () => { videoStopLocal(); if (room) room.sendStage(null); });
+
+/* ---- shared audio ---- */
+function startAudio(meta, startAt, play, broadcast) {
+  pauseRadioForStage("audio"); videoStopLocal(); audioStopLocal();
+  currentAudioId = meta.id; lastAudioDataUrl = meta.dataUrl; audioActive = true;
+  sharedAudio = new Audio(meta.dataUrl);
+  sharedAudio.onended = updateAudioToggle;
+  if (startAt) { try { sharedAudio.currentTime = startAt; } catch {} }
+  if (play) sharedAudio.play().catch(() => {});
+  $("audioNow").hidden = false; $("audioNowName").textContent = meta.name || "audio";
+  updateAudioToggle();
+  if (broadcast && room) { room.sendStage({ type: "audio", id: meta.id, name: meta.name, dataUrl: meta.dataUrl, playing: true, time: 0, ts: Date.now() }); room.sendRadio({ action: "stop" }); }
+}
+function audioStopLocal() {
+  if (sharedAudio) { try { sharedAudio.pause(); sharedAudio.src = ""; } catch {} sharedAudio = null; }
+  audioActive = false; currentAudioId = null; lastAudioDataUrl = null;
+  $("audioNow").hidden = true;
+}
+function updateAudioToggle() { $("audioToggle").textContent = (sharedAudio && !sharedAudio.paused) ? "⏸" : "▶"; }
+function audioStageState(playing) {
+  return { type: "audio", id: currentAudioId, name: $("audioNowName").textContent, dataUrl: lastAudioDataUrl, playing, time: sharedAudio ? sharedAudio.currentTime : 0, ts: Date.now() };
+}
+$("audioShareBtn").addEventListener("click", () => $("audioInput").click());
+$("audioInput").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  if (!room) { Bliss.toast("Join a room first"); return; }
+  if (file.size > MAX_AUDIO) { Bliss.toast({ title: "Too big", body: "Audio must be under 6 MB." }); return; }
+  let dataUrl; try { dataUrl = await readDataUrl(file); } catch { return; }
+  startAudio({ id: "a" + Date.now().toString(36), name: (file.name || "audio").slice(0, 48), dataUrl }, 0, true, true);
+});
+$("audioToggle").addEventListener("click", () => {
+  if (!sharedAudio || !room) return;
+  if (sharedAudio.paused) { sharedAudio.play().catch(() => {}); room.sendStage(audioStageState(true)); }
+  else { sharedAudio.pause(); room.sendStage(audioStageState(false)); }
+  updateAudioToggle();
+});
+
+/* ---- receive a shared-stage update ---- */
+function onRemoteStage(state) {
+  if (!state || !state.type) { videoStopLocal(); audioStopLocal(); return; }
+  const t = (state.time || 0) + (state.playing ? Math.max(0, (Date.now() - (state.ts || Date.now())) / 1000) : 0);
+  if (state.type === "video") {
+    pauseRadioForStage("video"); audioStopLocal();
+    $("ytPanel").hidden = false; ensureYT();
+    if (state.videoId !== currentVideoId) {
+      currentVideoId = state.videoId; videoActive = true;
+      watch.loadVideo(state.videoId, t, !!state.playing);
+    } else {
+      if (Math.abs(watch.currentTime() - t) > 2.5) watch.seek(t);
+      state.playing ? watch.play() : watch.pause();
+    }
+  } else if (state.type === "audio") {
+    pauseRadioForStage("audio"); videoStopLocal();
+    if (state.id !== currentAudioId) {
+      currentAudioId = state.id; lastAudioDataUrl = state.dataUrl || lastAudioDataUrl; audioActive = true;
+      if (sharedAudio) { try { sharedAudio.pause(); } catch {} }
+      sharedAudio = new Audio(lastAudioDataUrl);
+      sharedAudio.onended = updateAudioToggle;
+      $("audioNow").hidden = false; $("audioNowName").textContent = state.name || "audio";
+    }
+    if (sharedAudio) {
+      if (Math.abs(sharedAudio.currentTime - t) > 2.5) { try { sharedAudio.currentTime = t; } catch {} }
+      if (state.playing) sharedAudio.play().catch(() => {}); else sharedAudio.pause();
+    }
+    updateAudioToggle();
   }
 }
 
