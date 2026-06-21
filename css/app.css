@@ -159,6 +159,18 @@ html, body { height: 100%; margin: 0; }
 .ow-picker__sep { flex: 0 0 100%; height: 1px; background: var(--bl-line); margin: 4px 0; }
 .ow-picker__lbl { flex: 0 0 100%; font-family: var(--bl-font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--bl-ink-faint); padding: 2px 2px 0; }
 
+/* GIF search button + picker */
+.ow-gifbtn { font-weight: 700; font-size: 10px; letter-spacing: .04em; }
+.ow-gifpicker { flex-direction: column; flex-wrap: nowrap; width: 300px; max-height: 320px; gap: 6px; padding: 8px; }
+.ow-gifpicker__bar { display: flex; align-items: center; gap: 6px; width: 100%; }
+.ow-gifpicker__bar input { font-size: 12px; }
+.ow-gifpicker__credit { font-family: var(--bl-font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--bl-ink-faint); }
+.ow-gifpicker__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; width: 100%; overflow-y: auto; align-content: start; }
+.ow-gifpicker__cell { padding: 0; border: 1px solid var(--bl-line); border-radius: var(--bl-radius-sm); overflow: hidden; cursor: pointer; background: var(--bl-accent-soft); aspect-ratio: 1 / 1; }
+.ow-gifpicker__cell:hover { border-color: var(--bl-accent); box-shadow: 0 0 0 1px var(--bl-accent); }
+.ow-gifpicker__cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ow-gifpicker__msg { grid-column: 1 / -1; padding: 22px 6px; text-align: center; color: var(--bl-ink-faint); font-size: 12px; }
+
 /* drag-and-drop mask */
 .ow-chat { position: relative; }
 .ow-dropmask { position: absolute; inset: 6px; z-index: 5; display: grid; place-items: center; border: 2px dashed var(--bl-accent); border-radius: var(--bl-radius-lg); background: rgba(var(--bl-accent-rgb), 0.12); font-family: var(--bl-font-title); font-weight: 700; color: var(--bl-accent-deep); pointer-events: none; }

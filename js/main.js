@@ -10,6 +10,7 @@ import { joinRoom } from "./room.js";
 import { trackPresence } from "./presence.js";
 import * as media from "./media.js";
 import * as radio from "./radio.js";
+import { searchGifs } from "./gifs.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -409,6 +410,58 @@ function openEmojiPicker(anchor, onPick) {
   setTimeout(() => document.addEventListener("pointerdown", onPickerOutside, true), 0);
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePicker(); });
+
+// Position an open picker above (or below) its anchor button.
+function placePicker(anchor) {
+  const r = anchor.getBoundingClientRect();
+  const pw = pickerEl.offsetWidth, ph = pickerEl.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
+  let top = r.top - ph - 6; if (top < 8) top = r.bottom + 6;
+  pickerEl.style.left = left + "px"; pickerEl.style.top = top + "px";
+}
+
+/* ---- GIF picker (Tenor search), shares the picker close/outside logic ---- */
+function openGifPicker(anchor) {
+  closePicker();
+  pickerEl = document.createElement("div"); pickerEl.className = "ow-picker ow-gifpicker";
+  const bar = document.createElement("div"); bar.className = "ow-gifpicker__bar";
+  const input = document.createElement("input"); input.className = "bl-input bl-grow"; input.type = "text"; input.placeholder = "Search GIFs…"; input.maxLength = 60;
+  const credit = document.createElement("span"); credit.className = "ow-gifpicker__credit"; credit.textContent = "Tenor";
+  bar.append(input, credit);
+  const grid = document.createElement("div"); grid.className = "ow-gifpicker__grid";
+  pickerEl.append(bar, grid);
+  document.body.appendChild(pickerEl);
+  placePicker(anchor);
+  setTimeout(() => { document.addEventListener("pointerdown", onPickerOutside, true); input.focus(); }, 0);
+
+  let token = 0;
+  const msg = (t) => { grid.innerHTML = ""; const d = document.createElement("div"); d.className = "ow-gifpicker__msg"; d.textContent = t; grid.appendChild(d); };
+  async function run(q) {
+    const mine = ++token;
+    msg("Loading…");
+    try {
+      const gifs = await searchGifs(q);
+      if (mine !== token) return;
+      if (!gifs.length) return msg("No GIFs found.");
+      grid.innerHTML = "";
+      for (const g of gifs) {
+        const cell = document.createElement("button"); cell.type = "button"; cell.className = "ow-gifpicker__cell";
+        const im = document.createElement("img"); im.loading = "lazy"; im.src = g.preview; im.alt = g.title;
+        cell.appendChild(im);
+        cell.addEventListener("click", () => { sendGif(g.full); closePicker(); });
+        grid.appendChild(cell);
+      }
+    } catch { if (mine === token) msg("Couldn't reach Tenor. Try again."); }
+  }
+  let deb;
+  input.addEventListener("input", () => { clearTimeout(deb); deb = setTimeout(() => run(input.value), 350); });
+  run(""); // trending
+}
+function sendGif(url) {
+  if (!room) { Bliss.toast("Join a room first"); return; }
+  room.sendImage({ src: url });
+}
+$("gifBtn").addEventListener("click", () => openGifPicker($("gifBtn")));
 
 $("emojiBtn").addEventListener("click", () => openEmojiPicker($("emojiBtn"), insertEmoji));
 function insertEmoji(em) {
