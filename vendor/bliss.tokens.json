@@ -1,0 +1,137 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "name": "BLISS",
+  "version": "1.0.0",
+  "description": "A glossy, optimistic design system — a respectful homage to the Windows XP \"Luna\" visual style (2001). Tokens mirror the CSS custom properties in bliss.css (--bl-*). The three authentic Luna schemes (blue, olive, silver) live under `scheme`.",
+  "color": {
+    "blue": {
+      "50":  { "value": "#eaf3ff" },
+      "100": { "value": "#cfe0fb" },
+      "200": { "value": "#9fc0f4" },
+      "300": { "value": "#6aa9e4" },
+      "400": { "value": "#3f97ff", "comment": "gloss highlight" },
+      "500": { "value": "#1668e0", "comment": "gloss body / default accent" },
+      "600": { "value": "#0a55cf" },
+      "700": { "value": "#0a4ec4" },
+      "800": { "value": "#003db5" },
+      "900": { "value": "#0a246a" }
+    },
+    "olive": {
+      "300": { "value": "#a7b97f" },
+      "400": { "value": "#94a868" },
+      "500": { "value": "#7f9450", "comment": "documented Olive Green scheme" },
+      "600": { "value": "#6a7f3d" },
+      "700": { "value": "#566a2d" }
+    },
+    "silver": {
+      "100": { "value": "#fbfbfe" },
+      "300": { "value": "#e9e9f1" },
+      "400": { "value": "#c3c3d2", "comment": "Silver scheme body" },
+      "500": { "value": "#9a9aae" },
+      "600": { "value": "#7c7c90" }
+    },
+    "green": {
+      "300": { "value": "#7ec850", "comment": "Start orb highlight" },
+      "500": { "value": "#4ca325", "comment": "the green (go)" },
+      "600": { "value": "#357d18" },
+      "700": { "value": "#2c6b10" }
+    },
+    "grey": {
+      "0":   { "value": "#ffffff", "comment": "content" },
+      "50":  { "value": "#fbfaf4", "comment": "panel" },
+      "100": { "value": "#f6f4ec", "comment": "raised" },
+      "200": { "value": "#ece9d8", "comment": "THE XP dialog / control face" },
+      "300": { "value": "#dcd8c4" },
+      "400": { "value": "#aca899", "comment": "bevel shadow" },
+      "500": { "value": "#919b9c", "comment": "control outline" },
+      "700": { "value": "#51606e" },
+      "900": { "value": "#1b2733" }
+    },
+    "semantic": {
+      "canvas":     { "value": "#d8e7fb" },
+      "white":      { "value": "{color.grey.0}" },
+      "face":       { "value": "{color.grey.200}" },
+      "faceRaised": { "value": "{color.grey.100}" },
+      "facePanel":  { "value": "{color.grey.50}" },
+      "ink":        { "value": "{color.grey.900}" },
+      "inkDim":     { "value": "{color.grey.700}" },
+      "inkFaint":   { "value": "#8a96a2" },
+      "edgeLight":  { "value": "#ffffff", "comment": "raised top-left highlight" },
+      "edgeDark":   { "value": "{color.grey.400}" },
+      "edgeFrame":  { "value": "{color.grey.500}", "comment": "control outline" },
+      "edgeSunk":   { "value": "#7f9db9", "comment": "authentic XP field border" },
+      "line":       { "value": "#d6d2bf", "comment": "warm hairline" }
+    },
+    "status": {
+      "ok":     { "value": "#3ba33b" },
+      "info":   { "value": "#2a72e0" },
+      "warn":   { "value": "#e8920c" },
+      "danger": { "value": "#d23b2f" },
+      "tipBg":  { "value": "#ffffe1", "comment": "the iconic tooltip / balloon yellow" }
+    }
+  },
+  "scheme": {
+    "blue": {
+      "titleHi": { "value": "#3f97ff" }, "titleMid": { "value": "#1668e0" }, "titleLow": { "value": "#0a55cf" }, "titleEdge": { "value": "#003db5" }, "titleInk": { "value": "#ffffff" },
+      "accent": { "value": "#1668e0" }, "accentDeep": { "value": "#0a4ec4" }, "accentSoft": { "value": "#dbe8fb" },
+      "sel": { "value": "#316ac5" }, "selInk": { "value": "#ffffff" }
+    },
+    "olive": {
+      "titleHi": { "value": "#a7b97f" }, "titleMid": { "value": "#7f9450" }, "titleLow": { "value": "#6a7f3d" }, "titleEdge": { "value": "#566a2d" }, "titleInk": { "value": "#ffffff" },
+      "accent": { "value": "#6f8a3e" }, "accentDeep": { "value": "#4d662a" }, "accentSoft": { "value": "#eaefd9" },
+      "sel": { "value": "#8da75a" }, "selInk": { "value": "#ffffff" }
+    },
+    "silver": {
+      "titleHi": { "value": "#fbfbfe" }, "titleMid": { "value": "#c3c3d2" }, "titleLow": { "value": "#9a9aae" }, "titleEdge": { "value": "#7c7c90" }, "titleInk": { "value": "#33333f" },
+      "accent": { "value": "#6675a0" }, "accentDeep": { "value": "#4a5680" }, "accentSoft": { "value": "#e7e9f2" },
+      "sel": { "value": "#7a8ba8" }, "selInk": { "value": "#ffffff" }
+    }
+  },
+  "font": {
+    "title": { "value": "'Trebuchet MS', 'Segoe UI', Tahoma, system-ui, sans-serif", "comment": "window titles & headings" },
+    "ui":    { "value": "'Tahoma', 'Segoe UI', Verdana, Geneva, system-ui, sans-serif", "comment": "the working interface voice" },
+    "mono":  { "value": "'Lucida Console', 'Consolas', ui-monospace, monospace" }
+  },
+  "fontSize": {
+    "2xs": { "value": "0.6875rem" },
+    "xs":  { "value": "0.75rem" },
+    "sm":  { "value": "0.8125rem", "comment": "the working UI size" },
+    "md":  { "value": "0.9375rem" },
+    "lg":  { "value": "1.125rem" },
+    "xl":  { "value": "1.375rem" },
+    "2xl": { "value": "1.75rem" },
+    "3xl": { "value": "2.75rem" },
+    "display": { "value": "clamp(4rem, 13vw, 9.375rem)" }
+  },
+  "space": {
+    "1": { "value": "0.25rem" }, "2": { "value": "0.5rem" }, "3": { "value": "0.75rem" },
+    "4": { "value": "1rem" }, "5": { "value": "1.5rem" }, "6": { "value": "2rem" },
+    "8": { "value": "3rem" }, "10": { "value": "4rem" }
+  },
+  "radius": {
+    "xs": { "value": "2px" }, "sm": { "value": "3px" }, "md": { "value": "5px" },
+    "lg": { "value": "8px" }, "xl": { "value": "12px" }, "pill": { "value": "999px" }
+  },
+  "shadow": {
+    "1": { "value": "0 1px 2px rgba(20,40,80,0.16)" },
+    "2": { "value": "0 6px 18px rgba(20,40,80,0.22)" },
+    "3": { "value": "0 18px 48px rgba(15,30,70,0.34)" },
+    "insetSunk": { "value": "inset 1px 1px 2px rgba(0,0,0,0.12)" }
+  },
+  "gloss": {
+    "sheen": { "value": "linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.04) 46%, rgba(0,0,0,0.06) 54%, rgba(0,0,0,0.18) 100%)" },
+    "title": { "value": "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.22) 6%, rgba(255,255,255,0.05) 18%, rgba(255,255,255,0) 42%, rgba(0,0,0,0.05) 52%, rgba(0,0,0,0.13) 88%, rgba(255,255,255,0.12) 100%)", "comment": "the signature Luna title-bar gloss" },
+    "bar":   { "value": "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.08) 9%, rgba(255,255,255,0) 46%, rgba(0,0,0,0.06) 54%, rgba(0,0,0,0.22) 100%)" }
+  },
+  "motion": {
+    "ease":     { "value": "cubic-bezier(0.25, 0.1, 0.25, 1)", "comment": "gentle, friendly" },
+    "easePop":  { "value": "cubic-bezier(0.2, 0.9, 0.3, 1.2)", "comment": "a little candy bounce" },
+    "durFast":  { "value": "110ms" },
+    "durBase":  { "value": "180ms" },
+    "durSlow":  { "value": "220ms" }
+  },
+  "z": {
+    "base": { "value": 1 }, "raised": { "value": 10 }, "window": { "value": 100 },
+    "taskbar": { "value": 500 }, "menu": { "value": 1000 }, "overlay": { "value": 2000 }, "toast": { "value": 8000 }
+  }
+}
