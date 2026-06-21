@@ -22,7 +22,7 @@
 // ============================================================
 import * as peerjs from "https://esm.sh/peerjs@1.5.4";
 import { getLocalStream, hasMedia } from "./media.js";
-import { loadHistory, appendHistory, mergeHistory } from "./storage.js";
+import { loadHistory, appendHistory, mergeHistory, updateReaction } from "./storage.js";
 
 const Peer = peerjs.Peer || peerjs.default;
 const MESH_CAP = 8;           // max members before A/V mesh is suspended
@@ -83,14 +83,43 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     else { try { if (hubConn && hubConn.open) hubConn.send(env); } catch {} }
   }
 
-  function stampChat(text, member) {
-    return { id: newMsgId(), kind: "chat", from: member.id, name: member.name, color: member.color, text: String(text).slice(0, 2000), ts: Date.now() };
+  // A message can be plain text, an image, or a file. Payload from the sender
+  // is {kind, text?, image?, file?}; the hub stamps identity + id + time.
+  function stampMessage(payload, member) {
+    return {
+      id: newMsgId(),
+      kind: payload.kind || "chat",
+      from: member.id, name: member.name, color: member.color, ts: Date.now(),
+      text: payload.text != null ? String(payload.text).slice(0, 2000) : undefined,
+      image: payload.image || undefined,
+      file: payload.file || undefined,
+    };
   }
   function sysMsg(text) { return { id: newMsgId(), kind: "system", text, ts: Date.now() }; }
 
   function deliverChat(msg) {
     appendHistory(roomId, msg);
     h.onChat && h.onChat(msg);
+  }
+
+  // Send any message payload toward the room (hub stamps + relays).
+  function submit(payload) {
+    if (isHub) {
+      const msg = stampMessage(payload, selfMember());
+      deliverChat(msg); broadcast({ t: "chat", d: msg });
+    } else {
+      toHub({ t: "chat", d: payload });
+    }
+  }
+
+  // Toggle a reaction everywhere and persist it on the stored message.
+  function applyReact(msgId, emoji, from) {
+    const reactions = updateReaction(roomId, msgId, emoji, from);
+    h.onReact && h.onReact(msgId, reactions, emoji, from);
+  }
+  function hubReact(msgId, emoji, from) {
+    broadcast({ t: "react", d: { msgId, emoji, from } });
+    applyReact(msgId, emoji, from);
   }
 
   /* ---------------- hub: handle an incoming envelope ---------------- */
@@ -109,8 +138,11 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       emitRoster(); broadcast({ t: "roster", d: members.slice() });
     } else if (env.t === "chat") {
       const member = members.find((x) => x.peerId === fromPeerId) || { id: "?", name: "?", color: "#888" };
-      const msg = stampChat((env.d && env.d.text) || "", member);
+      const msg = stampMessage(env.d || {}, member);
       deliverChat(msg); broadcast({ t: "chat", d: msg });
+    } else if (env.t === "react") {
+      const member = members.find((x) => x.peerId === fromPeerId);
+      if (member && env.d) hubReact(env.d.msgId, env.d.emoji, member.id);
     } else if (env.t === "radio") {
       radioState = env.d || null;
       h.onRadio && h.onRadio(radioState);
@@ -138,6 +170,8 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
       emitRoster();
     } else if (env.t === "chat") {
       deliverChat(env.d);
+    } else if (env.t === "react") {
+      if (env.d) applyReact(env.d.msgId, env.d.emoji, env.d.from);
     } else if (env.t === "radio") {
       radioState = env.d || null;
       h.onRadio && h.onRadio(radioState);
@@ -275,12 +309,14 @@ export function joinRoom({ roomId, identity, handlers = {} }) {
     sendChat(text) {
       text = String(text || "").trim();
       if (!text) return;
-      if (isHub) {
-        const msg = stampChat(text, selfMember());
-        deliverChat(msg); broadcast({ t: "chat", d: msg });
-      } else {
-        toHub({ t: "chat", d: { text } });
-      }
+      submit({ kind: "chat", text });
+    },
+    sendImage(image, caption) { submit({ kind: "image", image, text: caption || undefined }); },
+    sendFile(file, caption) { submit({ kind: "file", file, text: caption || undefined }); },
+    sendReact(msgId, emoji) {
+      if (!msgId || !emoji) return;
+      if (isHub) hubReact(msgId, emoji, identity.id);
+      else toHub({ t: "react", d: { msgId, emoji } });
     },
     // Caller applies radio locally first (autoplay needs a gesture), then syncs.
     sendRadio(state) {

@@ -139,11 +139,15 @@
         </aside>
 
         <!-- chat -->
-        <div class="ow-chat">
+        <div class="ow-chat" id="chatPane">
+          <div class="ow-dropmask" id="dropMask" hidden>Drop to share 📎</div>
           <div class="ow-messages" id="messages" aria-live="polite"></div>
           <form class="ow-composer" id="composer">
-            <input class="bl-input bl-grow" id="msgInput" type="text" maxlength="2000" placeholder="Write a message…" autocomplete="off">
+            <button class="bl-btn bl-btn--icon" id="attachBtn" type="button" title="Share an image or file" aria-label="Attach">📎</button>
+            <button class="bl-btn bl-btn--icon" id="emojiBtn" type="button" title="Insert emoji" aria-label="Emoji">🙂</button>
+            <input class="bl-input bl-grow" id="msgInput" type="text" maxlength="2000" placeholder="Write a message, paste an image, or drop a file…" autocomplete="off">
             <button class="bl-btn bl-btn--default" type="submit">Send</button>
+            <input type="file" id="fileInput" multiple accept="image/*,*/*" hidden>
           </form>
         </div>
       </div>

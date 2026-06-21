@@ -20,7 +20,15 @@ let room = null;            // active room controller
 let currentRoomId = null;
 let matcher = null;         // active quick-match search
 const renderedIds = new Set();
+const msgEls = new Map();       // msgId -> { el, msg }  (for reactions / updates)
 const memberMap = new Map();   // id -> {name, color}
+
+const REACTIONS = ["👍", "❤️", "😂", "🎉", "😮", "😢", "🔥", "👀"];
+const EMOJIS = ["😀","😂","😍","😎","🤔","😴","😢","😡","🥳","😱","👍","👎","🙏","👏","🙌","🔥","❤️","💯","✨","🎉","👀","🤝","💀","🤯"];
+const IMG_RE = /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?[^\s]*)?$/i;
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+const MAX_FILE = 6 * 1024 * 1024;   // 6 MB cap for arbitrary files
+const MAX_IMG_DIM = 1280;           // downscale large images to this longest edge
 const tiles = new Map();       // memberId -> tile element
 let stations = [];
 let currentStation = null;
@@ -124,7 +132,7 @@ function showScreen(which) {
 function enterRoom(roomId, opts = {}) {
   if (room) room.leave();
   currentRoomId = roomId;
-  renderedIds.clear(); memberMap.clear(); tiles.clear();
+  renderedIds.clear(); msgEls.clear(); memberMap.clear(); tiles.clear();
   $("messages").innerHTML = "";
   $("memberList").innerHTML = "";
   $("mediaStrip").innerHTML = ""; $("mediaStrip").hidden = true;
@@ -148,6 +156,7 @@ function enterRoom(roomId, opts = {}) {
       onRoster: (members, info) => renderRoster(members, info),
       onHistory: (msgs) => msgs.forEach((m) => renderMessage(m)),
       onChat: (m) => renderMessage(m),
+      onReact: (msgId, reactions, emoji, from) => onReact(msgId, reactions, emoji, from),
       onRadio: (state) => onRemoteRadio(state),
       onRemoteStream: (memberId, stream) => addTile(memberId, stream, false),
       onRemoteEnd: (memberId) => removeTile(memberId),
@@ -155,6 +164,7 @@ function enterRoom(roomId, opts = {}) {
   });
 }
 function leaveRoom() {
+  closePicker();
   if (room) { room.leave(); room = null; }
   media.stopLocal(); radio.stopRadio();
   setMicState(false); setCamState(false);
@@ -207,6 +217,49 @@ function fmtTime(ts) {
   const d = new Date(ts || Date.now());
   return d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
 }
+// Turn a plain string into a fragment: clickable links, and inline thumbnails
+// for any URL that points at an image. Built with DOM nodes (no innerHTML) so
+// remote text can't inject markup.
+function linkify(text) {
+  const frag = document.createDocumentFragment();
+  const line = document.createElement("div"); line.className = "ow-msg__text";
+  const imgUrls = [];
+  let last = 0, m;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text))) {
+    if (m.index > last) line.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const url = m[0];
+    const a = document.createElement("a");
+    a.href = url; a.textContent = url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "bl-link";
+    line.appendChild(a);
+    if (IMG_RE.test(url)) imgUrls.push(url);
+    last = m.index + url.length;
+  }
+  if (last < text.length) line.appendChild(document.createTextNode(text.slice(last)));
+  frag.appendChild(line);
+  for (const url of imgUrls) frag.appendChild(makeChatImage(url));
+  return frag;
+}
+
+function makeChatImage(src) {
+  const img = document.createElement("img");
+  img.className = "ow-msg-img"; img.loading = "lazy"; img.src = src; img.alt = "shared image";
+  img.addEventListener("click", () => window.open(src, "_blank", "noopener"));
+  return img;
+}
+
+function makeFileChip(file) {
+  const a = document.createElement("a");
+  a.className = "ow-file"; a.href = file.dataUrl; a.download = file.name || "file"; a.title = "Download " + (file.name || "file");
+  const icon = document.createElement("span"); icon.className = "ow-file__icon"; icon.textContent = "📄";
+  const meta = document.createElement("span"); meta.className = "ow-file__meta";
+  const nm = document.createElement("div"); nm.className = "ow-file__name"; nm.textContent = file.name || "file";
+  const sz = document.createElement("div"); sz.className = "ow-file__size"; sz.textContent = fmtSize(file.size || 0);
+  meta.append(nm, sz); a.append(icon, meta);
+  return a;
+}
+function fmtSize(b) { return b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB"; }
+
 function renderMessage(msg) {
   if (!msg || !msg.id || renderedIds.has(msg.id)) return;
   renderedIds.add(msg.id);
@@ -217,20 +270,72 @@ function renderMessage(msg) {
     wrap.className = "ow-msg ow-msg--sys";
     const s = document.createElement("span"); s.className = "ow-sys"; s.textContent = msg.text;
     wrap.appendChild(s);
-  } else {
-    const me = msg.from === identity.id;
-    wrap.className = "ow-msg" + (me ? " ow-msg--me" : "");
-    const av = document.createElement("span");
-    av.className = "ow-avatar"; av.style.setProperty("--ow-color", msg.color || "#888"); av.textContent = initials(msg.name);
-    const body = document.createElement("div"); body.className = "ow-msg__body";
-    if (!me) { const who = document.createElement("div"); who.className = "ow-msg__who"; who.style.color = msg.color || ""; who.textContent = msg.name; body.appendChild(who); }
-    const text = document.createElement("div"); text.className = "ow-msg__text"; text.textContent = msg.text;
-    const time = document.createElement("div"); time.className = "ow-msg__time"; time.textContent = fmtTime(msg.ts);
-    body.append(text, time);
-    wrap.append(av, body);
+    $("messages").appendChild(wrap);
+    if (stick) $("messages").scrollTop = $("messages").scrollHeight;
+    return;
   }
+
+  const me = msg.from === identity.id;
+  wrap.className = "ow-msg" + (me ? " ow-msg--me" : "");
+  const av = document.createElement("span");
+  av.className = "ow-avatar"; av.style.setProperty("--ow-color", msg.color || "#888"); av.textContent = initials(msg.name);
+  const body = document.createElement("div"); body.className = "ow-msg__body";
+  if (!me) { const who = document.createElement("div"); who.className = "ow-msg__who"; who.style.color = msg.color || ""; who.textContent = msg.name; body.appendChild(who); }
+
+  if (msg.image && msg.image.src) body.appendChild(makeChatImage(msg.image.src));
+  if (msg.file && msg.file.dataUrl) body.appendChild(makeFileChip(msg.file));
+  if (msg.text) body.appendChild(linkify(msg.text));
+
+  const time = document.createElement("div"); time.className = "ow-msg__time"; time.textContent = fmtTime(msg.ts);
+  body.appendChild(time);
+
+  const reacts = document.createElement("div"); reacts.className = "ow-reacts";
+  body.appendChild(reacts);
+  wrap.append(av, body);
+
   $("messages").appendChild(wrap);
+  const entry = { el: wrap, msg, reacts };
+  msgEls.set(msg.id, entry);
+  renderReactions(entry);
   if (stick) $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+/* ---- reactions ---- */
+function renderReactions(entry) {
+  const { reacts, msg } = entry;
+  reacts.innerHTML = "";
+  const r = msg.reactions || {};
+  for (const emoji of Object.keys(r)) {
+    const ids = r[emoji] || [];
+    if (!ids.length) continue;
+    const mine = ids.includes(identity.id);
+    const chip = document.createElement("button");
+    chip.type = "button"; chip.className = "ow-react" + (mine ? " is-mine" : "");
+    chip.title = ids.map((id) => (id === identity.id ? "you" : (memberMap.get(id) || {}).name || "someone")).join(", ");
+    chip.innerHTML = "";
+    chip.append(document.createTextNode(emoji));
+    const n = document.createElement("span"); n.className = "ow-react__n"; n.textContent = ids.length; chip.appendChild(n);
+    chip.addEventListener("click", () => { if (room) room.sendReact(msg.id, emoji); });
+    reacts.appendChild(chip);
+  }
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "ow-react-add"; add.textContent = "＋"; add.title = "Add reaction";
+  add.addEventListener("click", (e) => { e.stopPropagation(); openPicker(add, REACTIONS, (emoji) => { if (room) room.sendReact(msg.id, emoji); }); });
+  reacts.appendChild(add);
+}
+
+function onReact(msgId, reactions, emoji, from) {
+  const entry = msgEls.get(msgId);
+  if (!entry) return;
+  if (reactions) entry.msg.reactions = reactions;
+  else { // message not in history (cap-evicted): toggle locally
+    const r = entry.msg.reactions || (entry.msg.reactions = {});
+    const arr = r[emoji] || [];
+    const i = arr.indexOf(from);
+    if (i >= 0) arr.splice(i, 1); else arr.push(from);
+    if (arr.length) r[emoji] = arr; else delete r[emoji];
+  }
+  renderReactions(entry);
 }
 
 $("composer").addEventListener("submit", (e) => {
@@ -240,6 +345,99 @@ $("composer").addEventListener("submit", (e) => {
   room.sendChat(text);
   $("msgInput").value = "";
 });
+
+/* ---- emoji picker (shared by reactions + composer) ---- */
+let pickerEl = null;
+function closePicker() {
+  if (pickerEl) { pickerEl.remove(); pickerEl = null; document.removeEventListener("pointerdown", onPickerOutside, true); }
+}
+function onPickerOutside(e) { if (pickerEl && !pickerEl.contains(e.target)) closePicker(); }
+function openPicker(anchor, emojis, onPick) {
+  closePicker();
+  pickerEl = document.createElement("div"); pickerEl.className = "ow-picker";
+  for (const em of emojis) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = em;
+    b.addEventListener("click", () => { onPick(em); closePicker(); });
+    pickerEl.appendChild(b);
+  }
+  document.body.appendChild(pickerEl);
+  const r = anchor.getBoundingClientRect();
+  const pw = pickerEl.offsetWidth, ph = pickerEl.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
+  let top = r.top - ph - 6; if (top < 8) top = r.bottom + 6;
+  pickerEl.style.left = left + "px"; pickerEl.style.top = top + "px";
+  setTimeout(() => document.addEventListener("pointerdown", onPickerOutside, true), 0);
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePicker(); });
+
+$("emojiBtn").addEventListener("click", () => openPicker($("emojiBtn"), EMOJIS, insertEmoji));
+function insertEmoji(em) {
+  const inp = $("msgInput");
+  const s = inp.selectionStart ?? inp.value.length, e = inp.selectionEnd ?? inp.value.length;
+  inp.value = inp.value.slice(0, s) + em + inp.value.slice(e);
+  inp.focus(); const pos = s + em.length; inp.setSelectionRange(pos, pos);
+}
+
+/* ---- file & image sharing ---- */
+$("attachBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", (e) => { handleFiles(e.target.files); e.target.value = ""; });
+
+$("msgInput").addEventListener("paste", (e) => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  const files = [];
+  for (const it of items) if (it.kind === "file") { const f = it.getAsFile(); if (f) files.push(f); }
+  if (files.length) { e.preventDefault(); handleFiles(files); }
+});
+
+const chatPane = $("chatPane");
+function hasFiles(e) { return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files"); }
+chatPane.addEventListener("dragover", (e) => { if (hasFiles(e)) { e.preventDefault(); $("dropMask").hidden = false; } });
+chatPane.addEventListener("dragleave", (e) => { if (!chatPane.contains(e.relatedTarget)) $("dropMask").hidden = true; });
+chatPane.addEventListener("drop", (e) => { $("dropMask").hidden = true; if (hasFiles(e)) { e.preventDefault(); handleFiles(e.dataTransfer.files); } });
+
+async function handleFiles(list) {
+  if (!room) { Bliss.toast("Join a room first"); return; }
+  for (const file of Array.from(list || [])) {
+    try {
+      if (file.type && file.type.startsWith("image/")) {
+        const image = await fileToImage(file);
+        if (image) room.sendImage(image);
+      } else {
+        const f = await fileToFile(file);
+        if (f) room.sendFile(f);
+      }
+    } catch { Bliss.toast({ title: "Share failed", body: file.name || "file" }); }
+  }
+}
+
+function readDataUrl(file) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+}
+function loadImg(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+
+// Downscale + compress an image to keep it light enough to relay and persist.
+async function fileToImage(file) {
+  const src = await readDataUrl(file);
+  if (file.type === "image/gif" && file.size <= 3 * 1024 * 1024) return { src, name: file.name }; // keep animation
+  const img = await loadImg(src);
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const scale = Math.min(1, MAX_IMG_DIM / Math.max(w, h || 1));
+  w = Math.max(1, Math.round(w * scale)); h = Math.max(1, Math.round(h * scale));
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(img, 0, 0, w, h);
+  const png = file.type === "image/png";
+  let out; try { out = c.toDataURL(png ? "image/png" : "image/jpeg", 0.82); } catch { out = src; }
+  if (out.length > src.length) out = src; // never make it bigger
+  return { src: out, w, h, name: file.name };
+}
+async function fileToFile(file) {
+  if (file.size > MAX_FILE) { Bliss.toast({ title: "Too big", body: (file.name || "file") + " is over 6 MB" }); return null; }
+  const dataUrl = await readDataUrl(file);
+  return { name: file.name, size: file.size, mime: file.type || "application/octet-stream", dataUrl };
+}
 
 /* ===================== voice / video ===================== */
 let micOn = false, camOn = false;

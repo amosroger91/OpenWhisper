@@ -66,3 +66,19 @@ export function mergeHistory(roomId, messages) {
 export function clearHistory(roomId) {
   try { localStorage.removeItem(HIST_KEY(roomId)); } catch {}
 }
+
+// Toggle one member's emoji reaction on a stored message. Returns the new
+// reactions object ({emoji: [memberId,...]}) or null if the message isn't
+// in history (e.g. evicted by the cap) — the caller can still update the DOM.
+export function updateReaction(roomId, msgId, emoji, from) {
+  const hist = loadHistory(roomId);
+  const m = hist.find((x) => x.id === msgId);
+  if (!m) return null;
+  m.reactions = m.reactions || {};
+  const arr = m.reactions[emoji] || [];
+  const i = arr.indexOf(from);
+  if (i >= 0) arr.splice(i, 1); else arr.push(from);
+  if (arr.length) m.reactions[emoji] = arr; else delete m.reactions[emoji];
+  write(HIST_KEY(roomId), hist);
+  return m.reactions;
+}

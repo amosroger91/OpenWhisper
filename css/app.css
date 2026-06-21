@@ -90,7 +90,37 @@ html, body { height: 100%; margin: 0; }
 .ow-msg--sys { align-self: center; max-width: 90%; }
 .ow-msg--sys .ow-sys { font-size: 11px; color: var(--bl-ink-faint); font-style: italic; background: rgba(0,0,0,0.04); padding: 2px 10px; border-radius: var(--bl-radius-pill); }
 
-.ow-composer { display: flex; gap: 6px; padding: var(--bl-space-3); border-top: 1px solid var(--bl-line); background: var(--bl-face-panel); }
+.ow-composer { display: flex; gap: 6px; padding: var(--bl-space-3); border-top: 1px solid var(--bl-line); background: var(--bl-face-panel); align-items: center; }
+
+/* images in chat (uploaded or linked URLs) */
+.ow-msg-img { display: block; max-width: min(320px, 60vw); max-height: 260px; width: auto; height: auto; margin-top: 5px; border-radius: var(--bl-radius-md); border: 1px solid var(--bl-line); cursor: zoom-in; background: #f1efe6; }
+
+/* file chips */
+.ow-file { display: inline-flex; align-items: center; gap: 9px; margin-top: 5px; padding: 7px 11px; border: 1px solid var(--bl-line); border-radius: var(--bl-radius-md); background: var(--bl-face-panel); text-decoration: none; color: var(--bl-ink); max-width: 280px; }
+.ow-file:hover { border-color: var(--bl-accent); }
+.ow-file__icon { font-size: 22px; flex: 0 0 auto; }
+.ow-file__meta { min-width: 0; }
+.ow-file__name { font-size: var(--bl-text-sm); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow-file__size { font-size: 11px; color: var(--bl-ink-faint); }
+
+/* reaction bar under a message */
+.ow-reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+.ow-react { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; line-height: 1; padding: 2px 7px; border: 1px solid var(--bl-line); border-radius: var(--bl-radius-pill); background: var(--bl-white); cursor: pointer; }
+.ow-react:hover { border-color: var(--bl-accent); }
+.ow-react.is-mine { background: var(--bl-accent-soft); border-color: var(--bl-accent); }
+.ow-react__n { font-size: 11px; color: var(--bl-ink-dim); }
+.ow-react-add { opacity: 0; font-size: 12px; padding: 1px 6px; border: 1px dashed var(--bl-line); border-radius: var(--bl-radius-pill); background: transparent; cursor: pointer; transition: opacity .12s; }
+.ow-msg:hover .ow-react-add { opacity: 0.85; }
+.ow-react-add:hover { border-style: solid; border-color: var(--bl-accent); }
+
+/* shared emoji popover (reactions + composer insert) */
+.ow-picker { position: fixed; z-index: 1000; display: flex; flex-wrap: wrap; gap: 2px; max-width: 232px; padding: 6px; background: var(--bl-white); border: 1px solid var(--bl-edge-frame); border-radius: var(--bl-radius-md); box-shadow: var(--bl-shadow-2); }
+.ow-picker button { font-size: 18px; line-height: 1; padding: 4px 5px; border: 0; background: transparent; border-radius: var(--bl-radius-sm); cursor: pointer; }
+.ow-picker button:hover { background: var(--bl-accent-soft); }
+
+/* drag-and-drop mask */
+.ow-chat { position: relative; }
+.ow-dropmask { position: absolute; inset: 6px; z-index: 5; display: grid; place-items: center; border: 2px dashed var(--bl-accent); border-radius: var(--bl-radius-lg); background: rgba(var(--bl-accent-rgb), 0.12); font-family: var(--bl-font-title); font-weight: 700; color: var(--bl-accent-deep); pointer-events: none; }
 
 /* pressed state for the toggle buttons */
 .bl-btn[aria-pressed="true"] { background: var(--bl-accent); color: #fff; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
